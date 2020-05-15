@@ -1,5 +1,5 @@
 from flask_restful import Resource
-from flask import jsonify, make_response, request
+from flask import make_response, request
 from mongoengine.errors import DoesNotExist, ValidationError
 from nutrify.documents.user_doc import UserDoc
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -11,18 +11,17 @@ auth = HTTPBasicAuth()
 
 @auth.verify_password
 def verify_password(username, password):
-    try:
-        user = UserDoc.objects(username=username).get()
+    # Return UserDoc if username matches else None
+    user = validate_user(username)
+
+    if user is not None:
         if not check_password_hash(user.password, password):
             return make_response("Invalid Password - Authentication failed!", 404)
 
-        return username
-
-    except DoesNotExist:
-        return make_response("Authentication failed!", 404)
+    return make_response("Authentication failed!", 404)
 
 
-class UserList(Resource):
+class Users(Resource):
     """
     This resource is for Creating user and Getting all users.
     """
@@ -67,26 +66,20 @@ class User(Resource):
     @auth.login_required
     def get(self, username):
         """
-        Returns User with matching username. Return 404 if username not found.
+        Returns User with matching username from authentication header
         """
+        if username == auth.username():
+            user_data = UserDoc.objects(username=auth.username()).get()
+            return make_response(user_data.sharable_details(), 200)
 
-        # Get UserDoc object from validate_user()
-        user = validate_user(username)
-
-        if user:
-            user_data = user.sharable_details()
-            return make_response(user_data, 200)
-
-        return make_response("User not found!", 404)
+        return make_response("Can't access user.", 401)
 
     # Update the user with given username as request param
     @auth.login_required
-    def put(self, username, body):
+    def put(self, username):
 
-        user = validate_user(username)
-
-        # If user exist
-        if user:
+        if username == auth.username():
+            user = UserDoc.objects(username=auth.username()).get()
             request_body = request.get_json()
 
             try:
@@ -104,20 +97,17 @@ class User(Resource):
             except ValidationError as ex:
                 return make_response({'message': ex.message}, 400)
 
-        return make_response("User not found!", 404)
+        return make_response("Can't access user.", 401)
 
     # Delete the user with given username as request param
     @auth.login_required
     def delete(self, username):
 
-        # Add functionality to delete the meals of this user,
-        # when this user is deleted.
+        # Get UserDoc object from authentication
+        if username == auth.username():
+            user = UserDoc.objects(username=auth.username())
 
-        # Get UserDoc object from validate_user()
-        user = validate_user(username)
-
-        if user:
             user.delete()
             return make_response("Successfully deleted user!", 200)
 
-        return make_response("User not found!", 404)
+        return make_response("Can't access user.", 401)

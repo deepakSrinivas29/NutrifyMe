@@ -1,5 +1,6 @@
 from flask_restful import Resource
 from flask import jsonify, make_response, request
+import json
 from nutrify.utils import fetch_calories
 from mongoengine.errors import DoesNotExist, ValidationError
 from nutrify.documents.user_doc import UserDoc
@@ -15,32 +16,25 @@ auth = HTTPBasicAuth()
 
 @auth.verify_password
 def verify_password(username, password):
+    # Return UserDoc if username matches else None
     user = validate_user(username)
 
-    if user:
+    if user is not None:
         if not check_password_hash(user.password, password):
             return make_response("Invalid Password - Authentication failed!", 404)
 
-        return username
-
-    return make_response("Invalid Username - Authentication failed!", 404)
+    return make_response("Authentication failed!", 404)
 
 
 class Meals(Resource):
 
     @auth.login_required
-    def get(self, username):
+    def get(self):
 
         # if username matches return all meals of the user
-        if validate_user(username) is not None:
-            meals_list = MealDoc.objects(username=username).all()
-
-            # converts each object in query set to dict and hold them in a list
-            meals_json = [meal.json_format() for meal in meals_list]
-
-            return make_response(jsonify(meals_json), 200)
-
-        return make_response("User not found!", 404)
+        meals_list = MealDoc.objects(username=auth.username()).exclude("id").all()
+        meals_json = [meal.json_format() for meal in meals_list]
+        return make_response(jsonify(meals_json), 200)
 
     # Creates new meal for a user
     def post(self):

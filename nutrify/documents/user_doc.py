@@ -8,7 +8,7 @@ class UserDoc(Document):
     email = EmailField(required=True, unique=True)
     password = StringField(required=True)
     calories_per_day = IntField(default=2000)
-    user_status = IntField(default=0)
+    user_status = IntField(default=["general"])
 
     meta = {
         'indices': ['username']
